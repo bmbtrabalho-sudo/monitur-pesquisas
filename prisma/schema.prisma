@@ -1,0 +1,200 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String    @id @default(uuid()) @db.Uuid
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  password      String?
+  role          UserRole  @default(USER)
+
+  // Relaciona o usuario as pesquisas que ele criou; a chave na pesquisa e opcional.
+  pesquisasCriadas Pesquisa[] @relation("CreatedBy")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model Pesquisa {
+  id             String       @id @default(uuid()) @db.Uuid
+  categoria      PesquisaCategoria @default(EVENTOS)
+  titulo         String       @db.VarChar(255)
+  descricao      String?      @db.Text
+
+  tituloProjeto        String?   @map("titulo_projeto") @db.VarChar(255)
+  objetivoGeral        String?   @map("objetivo_geral") @db.Text
+  objetivosEspecificos String?   @map("objetivos_especificos") @db.Text
+  justificativa        String?   @db.Text
+  publicoAlvo          String?   @map("publico_alvo") @db.Text
+  metodologia          String?   @db.Text
+  produtosEsperados    String?   @map("produtos_esperados") @db.Text
+  proponente           String?   @db.VarChar(255)
+  cnpjProponente       String?   @map("cnpj_proponente") @db.VarChar(20)
+  municipio            String?   @db.VarChar(100)
+  areaAbrangencia      String?   @map("area_abrangencia") @db.Text
+  processoSei          String?   @map("processo_sei") @db.VarChar(50)
+  valorTotal           Decimal?  @map("valor_total") @db.Decimal(12, 2)
+  fonteRecurso         String?   @map("fonte_recurso") @db.VarChar(255)
+  elementoDespesa      String?   @map("elemento_despesa") @db.VarChar(50)
+  dataInicio           DateTime? @map("data_inicio") @db.Date
+  dataFim              DateTime? @map("data_fim") @db.Date
+
+  status    PesquisaStatus @default(PLANEJADO)
+  createdBy String?        @db.Uuid @map("created_by")
+  creator   User?          @relation("CreatedBy", fields: [createdBy], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  formularios Formulario[]
+  Resposta    Resposta[]
+
+  @@map("pesquisas")
+}
+
+enum PesquisaCategoria {
+  EVENTOS
+  FEIRAS
+  FESTIVAL
+  MOTOCROSS
+  PESCA_ESPORTIVA
+}
+
+enum PesquisaStatus {
+  PLANEJADO
+  EM_ANDAMENTO
+  CONCLUIDO
+  CANCELADO
+}
+
+model Formulario {
+  id         String         @id @default(uuid()) @db.Uuid
+  pesquisaId String         @db.Uuid @map("pesquisa_id")
+  pesquisa   Pesquisa       @relation(fields: [pesquisaId], references: [id], onDelete: Cascade)
+  nome       String         @db.VarChar(255)
+  tipo       FormularioTipo @default(PARTICIPANTE)
+  descricao  String?        @db.Text
+  ativo      Boolean        @default(true)
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
+
+  perguntas Pergunta[]
+  respostas Resposta[]
+
+  @@map("formularios")
+}
+
+enum FormularioTipo {
+  PARTICIPANTE
+  EXPOSITOR
+  ORGANIZADOR
+}
+
+model Pergunta {
+  id           String     @id @default(uuid()) @db.Uuid
+  formularioId String     @db.Uuid @map("formulario_id")
+  formulario   Formulario @relation(fields: [formularioId], references: [id], onDelete: Cascade)
+
+  texto             String       @db.Text
+  tipoResposta      TipoResposta @map("tipo_resposta")
+  opcoesJson        Json?        @map("opcoes_json")
+  obrigatoria       Boolean      @default(false)
+  incluirOpcaoOutro Boolean      @default(false) @map("incluir_opcao_outro")
+  ordem             Int?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  respostasDetalhes RespostaDetalhe[]
+
+  @@map("perguntas")
+}
+
+enum TipoResposta {
+  TEXTO
+  NUMERO
+  OPCAO
+  MULTIPLA
+  LOCALIDADE_MUNICIPIO
+  GRADE_MULTIPLA_ESCOLHA
+}
+
+model Resposta {
+  id           String     @id @default(uuid()) @db.Uuid
+  formularioId String     @db.Uuid @map("formulario_id")
+  formulario   Formulario @relation(fields: [formularioId], references: [id], onDelete: Cascade)
+  pesquisaId   String     @db.Uuid @map("pesquisa_id")
+  pesquisa     Pesquisa   @relation(fields: [pesquisaId], references: [id], onDelete: Cascade)
+  dataResposta DateTime   @default(now()) @map("data_resposta")
+  ip           String?    @db.Inet()
+  userAgent    String?    @map("user_agent") @db.Text
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  // Uma resposta possui os valores informados para cada pergunta do formulario.
+  detalhes RespostaDetalhe[]
+
+  @@map("respostas")
+}
+
+model RespostaDetalhe {
+  id         String   @id @default(uuid()) @db.Uuid
+  respostaId String   @db.Uuid @map("resposta_id")
+  resposta   Resposta @relation(fields: [respostaId], references: [id], onDelete: Cascade)
+  perguntaId String   @db.Uuid @map("pergunta_id")
+  pergunta   Pergunta @relation(fields: [perguntaId], references: [id], onDelete: Cascade)
+
+  valorTexto  String?   @map("valor_texto") @db.Text
+  valorNumero Decimal?  @map("valor_numero") @db.Decimal(10, 2)
+  valorData   DateTime? @map("valor_data") @db.Date
+  valorOpcao  String?   @map("valor_opcao") @db.VarChar(255)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("respostas_detalhes")
+}
+
+model FormularioTemplate {
+  id        String         @id @default(uuid()) @db.Uuid
+  nome      String         @db.VarChar(255)
+  descricao String?        @db.Text
+  tipo      FormularioTipo @default(PARTICIPANTE)
+
+  perguntas PerguntaTemplate[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("formularios_templates")
+}
+
+model PerguntaTemplate {
+  id         String             @id @default(uuid()) @db.Uuid
+  templateId String             @db.Uuid @map("template_id")
+  template   FormularioTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  texto             String       @db.Text
+  tipoResposta      TipoResposta @map("tipo_resposta")
+  opcoesJson        Json?        @map("opcoes_json")
+  obrigatoria       Boolean      @default(false)
+  incluirOpcaoOutro Boolean      @default(false) @map("incluir_opcao_outro")
+  ordem             Int?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("perguntas_templates")
+}

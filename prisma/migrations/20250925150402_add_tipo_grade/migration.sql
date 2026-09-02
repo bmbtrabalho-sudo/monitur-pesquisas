@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "TipoResposta" ADD VALUE 'GRADE_MULTIPLA_ESCOLHA';
