@@ -6,6 +6,10 @@ services:
     restart: always
     env_file:
       - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-monitur}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-monitur}
+      POSTGRES_DB: ${POSTGRES_DB:-monitur}
     volumes:
       - db_data:/var/lib/postgresql/data
     networks:
@@ -16,10 +20,12 @@ services:
     restart: always
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-monitur}:${POSTGRES_PASSWORD:-monitur}@db:5432/${POSTGRES_DB:-monitur}
     depends_on:
       - db
     ports:
-      - "${APP_PORT}:3000"
+      - "${APP_PORT:-3000}:3000"
     networks:
       - app_network
 

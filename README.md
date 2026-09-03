@@ -123,28 +123,50 @@ Antes de iniciar, confirme que o ambiente local possui:
 - Node.js 20+
 - pnpm
 - PostgreSQL disponível
-- Git
+- Docker Desktop (recomendado) ou PostgreSQL disponível localmente
+
+Para preparar uma máquina sem internet, faça a instalação das dependências e o
+download das imagens Docker enquanto houver conexão. Depois disso, a aplicação
+funciona integralmente em `localhost`, sem chamadas a serviços externos.
 
 ## Variáveis de ambiente
 
-Crie um arquivo `.env` na raiz com as variáveis abaixo:
+Copie `.env.example` para `.env` e ajuste os valores:
 
 ```env
 DATABASE_URL="postgresql://usuario:senha@localhost:5432/monitur"
+APP_PORT="3000"
 NEXTAUTH_SECRET="gere-um-segredo-forte"
 NEXTAUTH_URL="http://localhost:3000"
 SEED_ADMIN_EMAIL="admin@exemplo.com"
 SEED_ADMIN_PASSWORD="senha-forte"
+POSTGRES_USER="monitur"
+POSTGRES_PASSWORD="monitur"
+POSTGRES_DB="monitur"
 ```
 
 Observações:
 
-- `DATABASE_URL` deve apontar para o banco PostgreSQL do projeto.
+- `DATABASE_URL` deve apontar para o banco PostgreSQL do projeto. No Docker, o Compose configura automaticamente o host `db`.
 - `NEXTAUTH_SECRET` é obrigatório para autenticação.
 - `NEXTAUTH_URL` deve refletir a URL em que a aplicação está sendo executada.
 - `SEED_ADMIN_EMAIL` e `SEED_ADMIN_PASSWORD` são usados para criar o usuário administrador inicial.
 
 ## Instalação e execução local
+
+### Usando Docker (recomendado para operação offline)
+
+Crie o arquivo `.env` conforme a seção de variáveis e execute:
+
+```bash
+docker compose up -d --build
+docker compose exec app pnpm run db:seed
+```
+
+O banco de dados fica persistido no volume local `db_data`. Para iniciar a
+aplicação posteriormente sem internet, use `docker compose up -d`.
+
+### Usando Node.js e PostgreSQL locais
 
 Instale as dependências:
 
@@ -170,7 +192,7 @@ Inicie a aplicação em desenvolvimento:
 pnpm dev
 ```
 
-A aplicação ficará disponível em:
+A aplicação ficará disponível em ambos os modos em:
 
 ```text
 http://localhost:3000
@@ -216,6 +238,13 @@ Arquivo principal:
 - `src/lib/auth.ts`
 
 O login usa e-mail e senha do usuário e valida as credenciais contra o banco via Prisma. O padrão de sessão e as regras de acesso ficam centralizadas no arquivo de autenticação.
+
+## Operação offline
+
+- O login, o painel administrativo, a criação de pesquisas e o registro de respostas usam apenas a aplicação e o PostgreSQL locais.
+- A lista de estados é embutida no sistema.
+- O município é digitado diretamente no formulário, portanto a coleta não depende da API do IBGE.
+- Não há fonte, CDN, mapa ou API externa necessária para executar o fluxo de pesquisa.
 
 ## Deploy
 

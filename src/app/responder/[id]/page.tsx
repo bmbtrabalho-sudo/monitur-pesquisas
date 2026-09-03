@@ -31,6 +31,48 @@ import {
 
 type FormularioComPerguntas = Formulario & { perguntas: Pergunta[] };
 
+type RespostaPendente = {
+  formularioId: string;
+  respostas: Record<string, unknown>;
+};
+
+const getFormularioCacheKey = (formularioId: string) =>
+  `monitur:formulario:${formularioId}`;
+const RESPOSTAS_PENDENTES_KEY = "monitur:respostas-pendentes";
+
+async function sincronizarRespostasPendentes() {
+  const armazenadas = localStorage.getItem(RESPOSTAS_PENDENTES_KEY);
+  if (!armazenadas) return;
+
+  let pendentes: RespostaPendente[];
+  try {
+    pendentes = JSON.parse(armazenadas);
+  } catch {
+    localStorage.removeItem(RESPOSTAS_PENDENTES_KEY);
+    return;
+  }
+
+  const restantes: RespostaPendente[] = [];
+  for (const payload of pendentes) {
+    try {
+      const response = await fetch("/api/public/respostas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) restantes.push(payload);
+    } catch {
+      restantes.push(payload);
+    }
+  }
+
+  if (restantes.length > 0) {
+    localStorage.setItem(RESPOSTAS_PENDENTES_KEY, JSON.stringify(restantes));
+  } else {
+    localStorage.removeItem(RESPOSTAS_PENDENTES_KEY);
+  }
+}
+
 function RenderizarPergunta({
   pergunta,
   control,
@@ -239,12 +281,18 @@ export default function PaginaDeResposta() {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [success, setSuccess] = useState(false);
+  const [isQueued, setIsQueued] = useState(false);
   const params = useParams();
   const formId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const form = useForm();
 
   useEffect(() => {
+    if (!formId) {
+      setIsLoading(false);
+      return;
+    }
+
     const fetchFormulario = async () => {
       try {
         const response = await fetch(`/api/public/formularios/${formId}`);
@@ -254,14 +302,27 @@ export default function PaginaDeResposta() {
           );
         const data = await response.json();
         setFormulario(data);
+        localStorage.setItem(getFormularioCacheKey(formId), JSON.stringify(data));
       } catch (err: any) {
-        toast.error(err.message);
+        const formularioCache = localStorage.getItem(getFormularioCacheKey(formId));
+        if (formularioCache) {
+          setFormulario(JSON.parse(formularioCache));
+        } else {
+          toast.error("Não foi possível carregar este formulário offline.");
+        }
       } finally {
         setIsLoading(false);
       }
     };
     fetchFormulario();
   }, [formId]);
+
+  useEffect(() => {
+    const sincronizar = () => void sincronizarRespostasPendentes();
+    window.addEventListener("online", sincronizar);
+    sincronizar();
+    return () => window.removeEventListener("online", sincronizar);
+  }, []);
 
   const onSubmit = async (data: any) => {
     if (!formulario) return;
@@ -282,11 +343,25 @@ export default function PaginaDeResposta() {
         respostas: respostasProcessadas,
       };
 
-      const response = await fetch("/api/public/respostas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      let response: Response;
+      try {
+        response = await fetch("/api/public/respostas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } catch {
+        const pendentes = JSON.parse(
+          localStorage.getItem(RESPOSTAS_PENDENTES_KEY) || "[]"
+        ) as RespostaPendente[];
+        localStorage.setItem(
+          RESPOSTAS_PENDENTES_KEY,
+          JSON.stringify([...pendentes, payload])
+        );
+        setIsQueued(true);
+        setSuccess(true);
+        return;
+      }
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -295,6 +370,7 @@ export default function PaginaDeResposta() {
         );
       }
 
+      setIsQueued(false);
       setSuccess(true);
     } catch (err: any) {
       toast.error(err.message);
@@ -314,7 +390,9 @@ export default function PaginaDeResposta() {
           Obrigado por responder!
         </h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Suas respostas foram enviadas com sucesso.
+          {isQueued
+            ? "Sem conexão no momento. Suas respostas foram salvas neste dispositivo e serão enviadas automaticamente quando a conexão voltar."
+            : "Suas respostas foram enviadas com sucesso."}
         </p>
       </div>
     );

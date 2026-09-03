@@ -1,14 +1,7 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
-import { Toaster, toast } from 'sonner'
+import { Toaster } from 'sonner'
 import AuthProvider from "@/components/auth-provider";
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  display: "swap",
-});
 
 // Define os metadados padrao compartilhados por todas as paginas da aplicacao.
 export const metadata: Metadata = {
@@ -26,7 +19,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body
-        className={`${inter.className} antialiased`}
+        className="antialiased"
       >
         <Toaster />
         <AuthProvider>
