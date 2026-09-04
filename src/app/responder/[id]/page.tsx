@@ -31,6 +31,46 @@ import {
 
 type FormularioComPerguntas = Formulario & { perguntas: Pergunta[] };
 
+type RespostaPendente = {
+  formularioId: string;
+  respostas: Record<string, unknown>;
+};
+
+const RESPOSTAS_PENDENTES_KEY = "monitur:respostas-pendentes";
+
+async function sincronizarRespostasPendentes() {
+  const armazenadas = localStorage.getItem(RESPOSTAS_PENDENTES_KEY);
+  if (!armazenadas) return;
+
+  let pendentes: RespostaPendente[];
+  try {
+    pendentes = JSON.parse(armazenadas);
+  } catch {
+    localStorage.removeItem(RESPOSTAS_PENDENTES_KEY);
+    return;
+  }
+
+  const restantes: RespostaPendente[] = [];
+  for (const payload of pendentes) {
+    try {
+      const response = await fetch("/api/public/respostas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) restantes.push(payload);
+    } catch {
+      restantes.push(payload);
+    }
+  }
+
+  if (restantes.length > 0) {
+    localStorage.setItem(RESPOSTAS_PENDENTES_KEY, JSON.stringify(restantes));
+  } else {
+    localStorage.removeItem(RESPOSTAS_PENDENTES_KEY);
+  }
+}
+
 function RenderizarPergunta({
   pergunta,
   control,
@@ -248,16 +288,24 @@ export default function PaginaDeResposta() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
-    void navigator.serviceWorker.getRegistrations().then((registrations) =>
-      Promise.all(registrations.map((registration) => registration.unregister()))
-    );
-    void caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key.startsWith("monitur-offline-"))
-          .map((key) => caches.delete(key))
-      )
-    );
+    void navigator.serviceWorker
+      .register("/sw.js", { updateViaCache: "none" })
+      .then(() => navigator.serviceWorker.ready)
+      .then((registration) => {
+        const recursos = performance
+          .getEntriesByType("resource")
+          .map((entry) => entry.name)
+          .filter((url) => url.startsWith(window.location.origin));
+        registration.active?.postMessage({
+          type: "CACHE_URLS",
+          urls: [
+            window.location.href,
+            `/api/public/formularios/${formId}`,
+            ...recursos,
+          ],
+        });
+      })
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -284,6 +332,13 @@ export default function PaginaDeResposta() {
     fetchFormulario();
   }, [formId]);
 
+  useEffect(() => {
+    const sincronizar = () => void sincronizarRespostasPendentes();
+    window.addEventListener("online", sincronizar);
+    sincronizar();
+    return () => window.removeEventListener("online", sincronizar);
+  }, []);
+
   const onSubmit = async (data: any) => {
     if (!formulario) return;
 
@@ -303,11 +358,25 @@ export default function PaginaDeResposta() {
         respostas: respostasProcessadas,
       };
 
-      const response = await fetch("/api/public/respostas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      let response: Response;
+      try {
+        response = await fetch("/api/public/respostas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } catch {
+        const pendentes = JSON.parse(
+          localStorage.getItem(RESPOSTAS_PENDENTES_KEY) || "[]"
+        ) as RespostaPendente[];
+        localStorage.setItem(
+          RESPOSTAS_PENDENTES_KEY,
+          JSON.stringify([...pendentes, payload])
+        );
+        setIsQueued(true);
+        setSuccess(true);
+        return;
+      }
 
       if (!response.ok) {
         const errorData = await response.json();
