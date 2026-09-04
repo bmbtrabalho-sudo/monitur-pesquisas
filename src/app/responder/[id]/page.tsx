@@ -31,48 +31,6 @@ import {
 
 type FormularioComPerguntas = Formulario & { perguntas: Pergunta[] };
 
-type RespostaPendente = {
-  formularioId: string;
-  respostas: Record<string, unknown>;
-};
-
-const getFormularioCacheKey = (formularioId: string) =>
-  `monitur:formulario:${formularioId}`;
-const RESPOSTAS_PENDENTES_KEY = "monitur:respostas-pendentes";
-
-async function sincronizarRespostasPendentes() {
-  const armazenadas = localStorage.getItem(RESPOSTAS_PENDENTES_KEY);
-  if (!armazenadas) return;
-
-  let pendentes: RespostaPendente[];
-  try {
-    pendentes = JSON.parse(armazenadas);
-  } catch {
-    localStorage.removeItem(RESPOSTAS_PENDENTES_KEY);
-    return;
-  }
-
-  const restantes: RespostaPendente[] = [];
-  for (const payload of pendentes) {
-    try {
-      const response = await fetch("/api/public/respostas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) restantes.push(payload);
-    } catch {
-      restantes.push(payload);
-    }
-  }
-
-  if (restantes.length > 0) {
-    localStorage.setItem(RESPOSTAS_PENDENTES_KEY, JSON.stringify(restantes));
-  } else {
-    localStorage.removeItem(RESPOSTAS_PENDENTES_KEY);
-  }
-}
-
 function RenderizarPergunta({
   pergunta,
   control,
@@ -288,22 +246,18 @@ export default function PaginaDeResposta() {
   const form = useForm();
 
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      const hadController = Boolean(navigator.serviceWorker.controller);
-      const registration = navigator.serviceWorker.register("/sw.js?v=2", {
-        updateViaCache: "none",
-      });
+    if (!("serviceWorker" in navigator)) return;
 
-      if (!hadController) {
-        const reloadAfterControl = () => window.location.reload();
-        navigator.serviceWorker.addEventListener("controllerchange", reloadAfterControl, {
-          once: true,
-        });
-        void registration.catch(() => {
-          navigator.serviceWorker.removeEventListener("controllerchange", reloadAfterControl);
-        });
-      }
-    }
+    void navigator.serviceWorker.getRegistrations().then((registrations) =>
+      Promise.all(registrations.map((registration) => registration.unregister()))
+    );
+    void caches.keys().then((keys) =>
+      Promise.all(
+        keys
+          .filter((key) => key.startsWith("monitur-offline-"))
+          .map((key) => caches.delete(key))
+      )
+    );
   }, []);
 
   useEffect(() => {
@@ -321,27 +275,14 @@ export default function PaginaDeResposta() {
           );
         const data = await response.json();
         setFormulario(data);
-        localStorage.setItem(getFormularioCacheKey(formId), JSON.stringify(data));
       } catch (err: any) {
-        const formularioCache = localStorage.getItem(getFormularioCacheKey(formId));
-        if (formularioCache) {
-          setFormulario(JSON.parse(formularioCache));
-        } else {
-          toast.error("Não foi possível carregar este formulário offline.");
-        }
+        toast.error(err.message || "Não foi possível carregar este formulário.");
       } finally {
         setIsLoading(false);
       }
     };
     fetchFormulario();
   }, [formId]);
-
-  useEffect(() => {
-    const sincronizar = () => void sincronizarRespostasPendentes();
-    window.addEventListener("online", sincronizar);
-    sincronizar();
-    return () => window.removeEventListener("online", sincronizar);
-  }, []);
 
   const onSubmit = async (data: any) => {
     if (!formulario) return;
@@ -362,25 +303,11 @@ export default function PaginaDeResposta() {
         respostas: respostasProcessadas,
       };
 
-      let response: Response;
-      try {
-        response = await fetch("/api/public/respostas", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-      } catch {
-        const pendentes = JSON.parse(
-          localStorage.getItem(RESPOSTAS_PENDENTES_KEY) || "[]"
-        ) as RespostaPendente[];
-        localStorage.setItem(
-          RESPOSTAS_PENDENTES_KEY,
-          JSON.stringify([...pendentes, payload])
-        );
-        setIsQueued(true);
-        setSuccess(true);
-        return;
-      }
+      const response = await fetch("/api/public/respostas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
