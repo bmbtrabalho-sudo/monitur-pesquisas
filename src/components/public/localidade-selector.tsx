@@ -1,29 +1,48 @@
-'use client';
+"use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FormControl } from "@/components/ui/form";
-import { MUNICIPIOS_RONDONIA } from "@/lib/pesquisa-options";
+import statesAndCities from "brazilian-cities";
 
-interface Estado {
-  id: number;
-  sigla: string;
-  nome: string;
-}
+type Estado = {
+  cod: string;
+  label: string;
+  cities: { label: string }[];
+};
 
-const ESTADO_RONDONIA: Estado = { id: 11, sigla: "RO", nome: "Rondônia" };
+const ESTADOS = statesAndCities as unknown as Estado[];
 
 export function LocalidadeSelector({ field }: { field: any }) {
-  const [selectedEstado, setSelectedEstado] = useState(ESTADO_RONDONIA.sigla);
-  
+  const [selectedEstado, setSelectedEstado] = useState("");
+  const municipios = useMemo(
+    () => ESTADOS.find((estado) => estado.cod === selectedEstado)?.cities ?? [],
+    [selectedEstado]
+  );
+
+  useEffect(() => {
+    const valor = typeof field.value === "string" ? field.value : "";
+    const estadoAtual = ESTADOS.find((estado) => valor.endsWith(` - ${estado.cod.toUpperCase()}`));
+    if (estadoAtual) setSelectedEstado(estadoAtual.cod);
+  }, [field.value]);
+
+  const alterarEstado = (estado: string) => {
+    setSelectedEstado(estado);
+    field.onChange("");
+  };
+
   return (
     <div className="grid grid-cols-1 w-full md:grid-cols-2 gap-4">
-      <Select value={selectedEstado} onValueChange={setSelectedEstado}>
+      <Select value={selectedEstado} onValueChange={alterarEstado}>
         <SelectTrigger>
           <SelectValue placeholder="Selecione o Estado" />
         </SelectTrigger>
         <SelectContent className="bg-white">
-          <SelectItem value={ESTADO_RONDONIA.sigla}>{ESTADO_RONDONIA.nome}</SelectItem>
+          {ESTADOS.map((estado) => (
+            <SelectItem key={estado.cod} value={estado.cod}>
+              {estado.label}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
 
@@ -37,8 +56,13 @@ export function LocalidadeSelector({ field }: { field: any }) {
           <SelectValue placeholder="Selecione o Município" />
         </SelectTrigger>
         <SelectContent className="bg-white">
-          {MUNICIPIOS_RONDONIA.map((municipio) => (
-            <SelectItem key={municipio} value={municipio}>{municipio}</SelectItem>
+          {municipios.map((municipio) => (
+            <SelectItem
+              key={municipio.label}
+              value={`${municipio.label} - ${selectedEstado.toUpperCase()}`}
+            >
+              {municipio.label}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>

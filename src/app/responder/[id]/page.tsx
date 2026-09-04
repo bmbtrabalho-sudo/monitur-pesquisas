@@ -288,6 +288,12 @@ export default function PaginaDeResposta() {
   const form = useForm();
 
   useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+    }
+  }, []);
+
+  useEffect(() => {
     if (!formId) {
       setIsLoading(false);
       return;
