@@ -1,4 +1,4 @@
-const CACHE_NAME = "monitur-offline-v1";
+const CACHE_NAME = "monitur-offline-v2";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -19,7 +19,12 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET" || new URL(event.request.url).origin !== self.location.origin) {
+  const requestUrl = new URL(event.request.url);
+  if (
+    event.request.method !== "GET" ||
+    requestUrl.origin !== self.location.origin ||
+    requestUrl.pathname === "/sw.js"
+  ) {
     return;
   }
 

@@ -289,7 +289,20 @@ export default function PaginaDeResposta() {
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+      const hadController = Boolean(navigator.serviceWorker.controller);
+      const registration = navigator.serviceWorker.register("/sw.js?v=2", {
+        updateViaCache: "none",
+      });
+
+      if (!hadController) {
+        const reloadAfterControl = () => window.location.reload();
+        navigator.serviceWorker.addEventListener("controllerchange", reloadAfterControl, {
+          once: true,
+        });
+        void registration.catch(() => {
+          navigator.serviceWorker.removeEventListener("controllerchange", reloadAfterControl);
+        });
+      }
     }
   }, []);
 

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FormControl } from "@/components/ui/form";
-import statesAndCities from "brazilian-cities";
+import { allStates } from "brazilian-cities";
 
 type Estado = {
   cod: string;
@@ -11,7 +11,7 @@ type Estado = {
   cities: { label: string }[];
 };
 
-const ESTADOS = statesAndCities as unknown as Estado[];
+const ESTADOS = allStates() as unknown as Estado[];
 
 export function LocalidadeSelector({ field }: { field: any }) {
   const [selectedEstado, setSelectedEstado] = useState("");
