@@ -1,17 +1,21 @@
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
-import { PesquisaCategoria } from "@prisma/client";
+import { PesquisaCategoria, TipoPublicacao } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 const MAX_PDF_SIZE = 20 * 1024 * 1024;
+const MAX_COVER_SIZE = 10 * 1024 * 1024;
 
 const reportSchema = z.object({
+  tipo: z.nativeEnum(TipoPublicacao),
   titulo: z.string().trim().min(1, "Título é obrigatório.").max(255),
-  categoria: z.nativeEnum(PesquisaCategoria),
-  dataEvento: z.coerce.date({ required_error: "Data do evento é obrigatória." }),
-  descricao: z.string().trim().min(1, "A descrição é obrigatória."),
+  categoria: z.nativeEnum(PesquisaCategoria).optional(),
+  dataInicio: z.coerce.date().optional(),
+  dataFim: z.coerce.date().optional(),
+  mesAno: z.string().regex(/^\d{4}-\d{2}$/, "Mês e ano inválidos.").optional(),
+  descricao: z.string().trim().optional(),
 });
 
 export async function GET() {
@@ -22,15 +26,20 @@ export async function GET() {
   }
 
   const relatorios = await prisma.relatorioEvento.findMany({
-    orderBy: [{ dataEvento: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ dataInicio: "desc" }, { createdAt: "desc" }],
     select: {
       id: true,
+      tipo: true,
       titulo: true,
       categoria: true,
-      dataEvento: true,
+      dataInicio: true,
+      dataFim: true,
+      mesAno: true,
       descricao: true,
       nomeArquivo: true,
       tamanhoArquivo: true,
+      nomeImagemCapa: true,
+      tamanhoCapa: true,
       createdAt: true,
     },
   });
@@ -48,12 +57,26 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const arquivo = formData.get("arquivoPdf");
+    const imagemCapa = formData.get("imagemCapa");
     const dados = reportSchema.parse({
+      tipo: formData.get("tipo"),
       titulo: formData.get("titulo"),
-      categoria: formData.get("categoria"),
-      dataEvento: formData.get("dataEvento"),
-      descricao: formData.get("descricao"),
+      categoria: formData.get("categoria") || undefined,
+      dataInicio: formData.get("dataInicio") || undefined,
+      dataFim: formData.get("dataFim") || undefined,
+      mesAno: formData.get("mesAno") || undefined,
+      descricao: formData.get("descricao") || undefined,
     });
+
+    if (dados.tipo === TipoPublicacao.RELATORIO_EVENTO && (!dados.categoria || !dados.dataInicio || !dados.dataFim || !dados.descricao)) {
+      return NextResponse.json({ message: "Preencha os campos do relatório de evento." }, { status: 400 });
+    }
+    if (dados.tipo === TipoPublicacao.BOLETIM_MENSAL && !dados.mesAno) {
+      return NextResponse.json({ message: "Informe o mês e o ano do boletim." }, { status: 400 });
+    }
+    if (dados.dataInicio && dados.dataFim && dados.dataFim < dados.dataInicio) {
+      return NextResponse.json({ message: "A data final não pode ser anterior à data inicial." }, { status: 400 });
+    }
 
     if (!(arquivo instanceof File) || arquivo.size === 0) {
       return NextResponse.json({ message: "Anexe um arquivo PDF." }, { status: 400 });
@@ -64,6 +87,15 @@ export async function POST(request: NextRequest) {
     if (arquivo.size > MAX_PDF_SIZE) {
       return NextResponse.json({ message: "O PDF deve ter no máximo 20 MB." }, { status: 400 });
     }
+    if (!(imagemCapa instanceof File) || imagemCapa.size === 0) {
+      return NextResponse.json({ message: "Anexe uma imagem para a capa." }, { status: 400 });
+    }
+    if (!imagemCapa.type.startsWith("image/")) {
+      return NextResponse.json({ message: "A capa deve ser uma imagem." }, { status: 400 });
+    }
+    if (imagemCapa.size > MAX_COVER_SIZE) {
+      return NextResponse.json({ message: "A imagem da capa deve ter no máximo 10 MB." }, { status: 400 });
+    }
 
     const relatorio = await prisma.relatorioEvento.create({
       data: {
@@ -72,6 +104,10 @@ export async function POST(request: NextRequest) {
         nomeArquivo: arquivo.name,
         mimeType: arquivo.type,
         tamanhoArquivo: arquivo.size,
+        imagemCapa: Buffer.from(await imagemCapa.arrayBuffer()),
+        nomeImagemCapa: imagemCapa.name,
+        mimeImagemCapa: imagemCapa.type,
+        tamanhoCapa: imagemCapa.size,
         createdBy: session.user.id,
       },
       select: { id: true, titulo: true },

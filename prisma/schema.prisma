@@ -30,22 +30,34 @@ enum UserRole {
 
 model RelatorioEvento {
   id             String            @id @default(uuid()) @db.Uuid
+  tipo           TipoPublicacao    @default(RELATORIO_EVENTO)
   titulo         String            @db.VarChar(255)
-  categoria      PesquisaCategoria
-  dataEvento     DateTime          @map("data_evento") @db.Date
-  descricao      String            @db.Text
+  categoria      PesquisaCategoria?
+  dataInicio     DateTime?         @map("data_inicio") @db.Date
+  dataFim        DateTime?         @map("data_fim") @db.Date
+  mesAno         String?           @map("mes_ano") @db.VarChar(7)
+  descricao      String?           @db.Text
   arquivoPdf     Bytes             @map("arquivo_pdf")
   nomeArquivo    String            @map("nome_arquivo") @db.VarChar(255)
   mimeType       String            @default("application/pdf") @map("mime_type") @db.VarChar(100)
   tamanhoArquivo Int               @map("tamanho_arquivo")
+  imagemCapa     Bytes?            @map("imagem_capa")
+  nomeImagemCapa String?           @map("nome_imagem_capa") @db.VarChar(255)
+  mimeImagemCapa String?           @map("mime_imagem_capa") @db.VarChar(100)
+  tamanhoCapa    Int?              @map("tamanho_capa")
   createdBy      String?           @map("created_by") @db.Uuid
   creator        User?             @relation("RelatorioCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
   createdAt      DateTime          @default(now()) @map("created_at")
   updatedAt      DateTime          @updatedAt @map("updated_at")
 
   @@index([categoria])
-  @@index([dataEvento])
+  @@index([dataInicio])
   @@map("relatorios_eventos")
+}
+
+enum TipoPublicacao {
+  RELATORIO_EVENTO
+  BOLETIM_MENSAL
 }
 
 model Pesquisa {

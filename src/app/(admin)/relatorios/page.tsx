@@ -3,15 +3,20 @@ import { prisma } from "@/lib/prisma";
 
 async function getRelatorios() {
   return prisma.relatorioEvento.findMany({
-    orderBy: [{ dataEvento: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ dataInicio: "desc" }, { createdAt: "desc" }],
     select: {
       id: true,
+      tipo: true,
       titulo: true,
       categoria: true,
-      dataEvento: true,
+      dataInicio: true,
+      dataFim: true,
+      mesAno: true,
       descricao: true,
       nomeArquivo: true,
       tamanhoArquivo: true,
+      nomeImagemCapa: true,
+      tamanhoCapa: true,
       createdAt: true,
     },
   });
