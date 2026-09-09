@@ -48,6 +48,7 @@ interface RelatoriosListProps {
 export default function RelatoriosList({ relatoriosIniciais }: RelatoriosListProps) {
   const [relatorios, setRelatorios] = useState(relatoriosIniciais);
   const [tipoSelecionado, setTipoSelecionado] = useState<TipoPublicacao | null>(null);
+  const [escolhaAberta, setEscolhaAberta] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [mensagem, setMensagem] = useState<{ texto: string; sucesso: boolean } | null>(null);
 
@@ -76,6 +77,7 @@ export default function RelatoriosList({ relatoriosIniciais }: RelatoriosListPro
 
       event.currentTarget.reset();
       setTipoSelecionado(null);
+      setEscolhaAberta(false);
       setMensagem({ texto: "Publicado com sucesso.", sucesso: true });
       try { await atualizarLista(); } catch { /* A publicação já foi salva. */ }
     } catch {
@@ -92,17 +94,17 @@ export default function RelatoriosList({ relatoriosIniciais }: RelatoriosListPro
           <h1 className="text-2xl font-bold tracking-tight">Publicações</h1>
           <p className="mt-1 text-sm text-muted-foreground">Publique relatórios de eventos e boletins mensais em PDF.</p>
         </div>
-        <Button onClick={() => setTipoSelecionado(tipoSelecionado ? null : TipoPublicacao.RELATORIO_EVENTO)}><Plus />Publicar novo</Button>
+        <Button onClick={() => setEscolhaAberta(!escolhaAberta)}><Plus />Publicar novo</Button>
       </div>
 
       {mensagem && <p className={`rounded-md border p-3 text-sm ${mensagem.sucesso ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-800"}`}>{mensagem.texto}</p>}
 
-      {tipoSelecionado === null && (
+      {escolhaAberta && tipoSelecionado === null && (
         <div className="rounded-lg border bg-white p-5 shadow-sm">
           <h2 className="font-semibold">O que deseja publicar?</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <Button variant="outline" className="h-auto justify-start p-4 text-left" onClick={() => setTipoSelecionado(TipoPublicacao.RELATORIO_EVENTO)}><FileText /><span><strong className="block">Novo Relatório de Evento</strong><small className="font-normal text-muted-foreground">Período, categoria e descrição do evento</small></span></Button>
-            <Button variant="outline" className="h-auto justify-start p-4 text-left" onClick={() => setTipoSelecionado(TipoPublicacao.BOLETIM_MENSAL)}><FileText /><span><strong className="block">Novo Boletim Mensal</strong><small className="font-normal text-muted-foreground">Título e mês/ano da publicação</small></span></Button>
+            <Button variant="outline" className="h-auto justify-start p-4 text-left" onClick={() => { setTipoSelecionado(TipoPublicacao.RELATORIO_EVENTO); setEscolhaAberta(false); }}><FileText /><span><strong className="block">Novo Relatório de Evento</strong><small className="font-normal text-muted-foreground">Período, categoria e descrição do evento</small></span></Button>
+            <Button variant="outline" className="h-auto justify-start p-4 text-left" onClick={() => { setTipoSelecionado(TipoPublicacao.BOLETIM_MENSAL); setEscolhaAberta(false); }}><FileText /><span><strong className="block">Novo Boletim Mensal</strong><small className="font-normal text-muted-foreground">Título e mês/ano da publicação</small></span></Button>
           </div>
         </div>
       )}
@@ -110,7 +112,7 @@ export default function RelatoriosList({ relatoriosIniciais }: RelatoriosListPro
       {tipoSelecionado && (
         <form onSubmit={publicarRelatorio} className="space-y-5 rounded-lg border bg-white p-5 shadow-sm sm:p-6">
           <input type="hidden" name="tipo" value={tipoSelecionado} />
-          <div className="flex items-center justify-between border-b pb-4"><h2 className="text-lg font-semibold">{tipoSelecionado === TipoPublicacao.RELATORIO_EVENTO ? "Novo Relatório de Evento" : "Novo Boletim Mensal"}</h2><Button type="button" variant="ghost" onClick={() => setTipoSelecionado(null)}>Trocar tipo</Button></div>
+          <div className="flex items-center justify-between border-b pb-4"><h2 className="text-lg font-semibold">{tipoSelecionado === TipoPublicacao.RELATORIO_EVENTO ? "Novo Relatório de Evento" : "Novo Boletim Mensal"}</h2><Button type="button" variant="ghost" onClick={() => { setTipoSelecionado(null); setEscolhaAberta(true); }}>Trocar tipo</Button></div>
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2"><Label htmlFor="titulo">Título</Label><Input id="titulo" name="titulo" maxLength={255} required /></div>
             {tipoSelecionado === TipoPublicacao.RELATORIO_EVENTO ? <>
@@ -123,7 +125,7 @@ export default function RelatoriosList({ relatoriosIniciais }: RelatoriosListPro
             <div className="space-y-2"><Label htmlFor="arquivoPdf">Documento PDF</Label><Input id="arquivoPdf" name="arquivoPdf" type="file" accept="application/pdf,.pdf" required /><p className="text-xs text-muted-foreground">PDF de até 20 MB.</p></div>
             <div className="space-y-2"><Label htmlFor="imagemCapa">Imagem da capa</Label><Input id="imagemCapa" name="imagemCapa" type="file" accept="image/*" required /><p className="text-xs text-muted-foreground">Imagem de até 10 MB.</p></div>
           </div>
-          <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setTipoSelecionado(null)}>Cancelar</Button><Button type="submit" disabled={isLoading}>{isLoading ? "Publicando..." : "Publicar"}</Button></div>
+          <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => { setTipoSelecionado(null); setEscolhaAberta(false); }}>Cancelar</Button><Button type="submit" disabled={isLoading}>{isLoading ? "Publicando..." : "Publicar"}</Button></div>
         </form>
       )}
 
