@@ -16,7 +16,8 @@ model User {
   role          UserRole  @default(USER)
 
   // Relaciona o usuario as pesquisas que ele criou; a chave na pesquisa e opcional.
-  pesquisasCriadas Pesquisa[] @relation("CreatedBy")
+  pesquisasCriadas  Pesquisa[]        @relation("CreatedBy")
+  relatoriosCriados RelatorioEvento[] @relation("RelatorioCreatedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -27,11 +28,31 @@ enum UserRole {
   ADMIN
 }
 
+model RelatorioEvento {
+  id             String            @id @default(uuid()) @db.Uuid
+  titulo         String            @db.VarChar(255)
+  categoria      PesquisaCategoria
+  dataEvento     DateTime          @map("data_evento") @db.Date
+  descricao      String            @db.Text
+  arquivoPdf     Bytes             @map("arquivo_pdf")
+  nomeArquivo    String            @map("nome_arquivo") @db.VarChar(255)
+  mimeType       String            @default("application/pdf") @map("mime_type") @db.VarChar(100)
+  tamanhoArquivo Int               @map("tamanho_arquivo")
+  createdBy      String?           @map("created_by") @db.Uuid
+  creator        User?             @relation("RelatorioCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  @@index([categoria])
+  @@index([dataEvento])
+  @@map("relatorios_eventos")
+}
+
 model Pesquisa {
-  id             String       @id @default(uuid()) @db.Uuid
-  categoria      PesquisaCategoria @default(EVENTOS)
-  titulo         String       @db.VarChar(255)
-  descricao      String?      @db.Text
+  id        String            @id @default(uuid()) @db.Uuid
+  categoria PesquisaCategoria @default(EVENTOS)
+  titulo    String            @db.VarChar(255)
+  descricao String?           @db.Text
 
   tituloProjeto        String?   @map("titulo_projeto") @db.VarChar(255)
   objetivoGeral        String?   @map("objetivo_geral") @db.Text
@@ -52,7 +73,7 @@ model Pesquisa {
   dataFim              DateTime? @map("data_fim") @db.Date
 
   status    PesquisaStatus @default(PLANEJADO)
-  createdBy String?        @db.Uuid @map("created_by")
+  createdBy String?        @map("created_by") @db.Uuid
   creator   User?          @relation("CreatedBy", fields: [createdBy], references: [id])
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -81,7 +102,7 @@ enum PesquisaStatus {
 
 model Formulario {
   id         String         @id @default(uuid()) @db.Uuid
-  pesquisaId String         @db.Uuid @map("pesquisa_id")
+  pesquisaId String         @map("pesquisa_id") @db.Uuid
   pesquisa   Pesquisa       @relation(fields: [pesquisaId], references: [id], onDelete: Cascade)
   nome       String         @db.VarChar(255)
   tipo       FormularioTipo @default(PARTICIPANTE)
@@ -104,7 +125,7 @@ enum FormularioTipo {
 
 model Pergunta {
   id           String     @id @default(uuid()) @db.Uuid
-  formularioId String     @db.Uuid @map("formulario_id")
+  formularioId String     @map("formulario_id") @db.Uuid
   formulario   Formulario @relation(fields: [formularioId], references: [id], onDelete: Cascade)
 
   texto             String       @db.Text
@@ -133,9 +154,9 @@ enum TipoResposta {
 
 model Resposta {
   id           String     @id @default(uuid()) @db.Uuid
-  formularioId String     @db.Uuid @map("formulario_id")
+  formularioId String     @map("formulario_id") @db.Uuid
   formulario   Formulario @relation(fields: [formularioId], references: [id], onDelete: Cascade)
-  pesquisaId   String     @db.Uuid @map("pesquisa_id")
+  pesquisaId   String     @map("pesquisa_id") @db.Uuid
   pesquisa     Pesquisa   @relation(fields: [pesquisaId], references: [id], onDelete: Cascade)
   dataResposta DateTime   @default(now()) @map("data_resposta")
   ip           String?    @db.Inet()
@@ -151,9 +172,9 @@ model Resposta {
 
 model RespostaDetalhe {
   id         String   @id @default(uuid()) @db.Uuid
-  respostaId String   @db.Uuid @map("resposta_id")
+  respostaId String   @map("resposta_id") @db.Uuid
   resposta   Resposta @relation(fields: [respostaId], references: [id], onDelete: Cascade)
-  perguntaId String   @db.Uuid @map("pergunta_id")
+  perguntaId String   @map("pergunta_id") @db.Uuid
   pergunta   Pergunta @relation(fields: [perguntaId], references: [id], onDelete: Cascade)
 
   valorTexto  String?   @map("valor_texto") @db.Text
@@ -183,7 +204,7 @@ model FormularioTemplate {
 
 model PerguntaTemplate {
   id         String             @id @default(uuid()) @db.Uuid
-  templateId String             @db.Uuid @map("template_id")
+  templateId String             @map("template_id") @db.Uuid
   template   FormularioTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   texto             String       @db.Text

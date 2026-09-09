@@ -21,6 +21,7 @@ import Image from "next/image";
 const navItems = [
   { title: "Home", href: "/dashboard" },
   { title: "Pesquisas", href: "/pesquisas" },
+  { title: "Relatórios", href: "/relatorios" },
   { title: "Modelos", href: "/templates" },
 ];
 
